@@ -1,10 +1,12 @@
-FROM python:3.11-slim
+FROM node:18-alpine
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY package*.json ./
+RUN npm install --production
 
 COPY . .
 
-CMD ["celery", "-A", "celery_app", "worker", "--loglevel=info", "--beat"]
+EXPOSE 5001
+
+CMD ["npm", "start"]
