@@ -1,0 +1,171 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:6.0
+    container_name: markethub-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - markethub-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: markethub-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - markethub-network
+
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: markethub-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    networks:
+      - markethub-network
+
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: markethub-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - markethub-network
+
+  # Logstash
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: markethub-logstash
+    volumes:
+      - ./monitoring/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    ports:
+      - "5005:5000"
+    environment:
+      - "LS_JAVA_OPTS=-Xmx256m -Xms256m"
+    depends_on:
+      - elasticsearch
+    networks:
+      - markethub-network
+
+  # Kibana
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: markethub-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - markethub-network
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: markethub-prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - markethub-network
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: markethub-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      - prometheus
+    networks:
+      - markethub-network
+
+  # Backend Node.js API
+  backend:  
+    build: ./backend
+    container_name: markethub-backend
+    ports:
+      - "5001:5001"
+    environment:
+      - NODE_ENV=production
+      - PORT=5001
+      - MONGODB_URI=mongodb://admin:admin123@mongodb:27017/markethub?authSource=admin
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5000
+      - SERPAPI_API_KEY=<your-serpapi-key-here>
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+      - logstash
+    networks:
+      - markethub-network
+
+  # Celery Worker
+  celery-worker:
+    build: ./celery-worker
+    container_name: markethub-celery
+    environment:
+      - CELERY_BROKER_URL=amqp://admin:admin123@rabbitmq:5672
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - MONGODB_URI=mongodb://admin:admin123@mongodb:27017/markethub?authSource=admin
+    depends_on:
+      - rabbitmq
+      - redis
+      - mongodb
+    networks:
+      - markethub-network
+
+  # Frontend React App
+  frontend:
+    build: ./frontend
+    container_name: markethub-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - markethub-network
+
+volumes:
+  mongodb_data:
+  elasticsearch_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  markethub-network:
+    driver: bridge

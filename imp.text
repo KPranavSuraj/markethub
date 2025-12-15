@@ -1,0 +1,9 @@
+Frontend (Main App) http://localhost:3000 Register new user
+Backend API http://localhost:5001 
+Grafana (Monitoring) http://localhost:3001 admin / admin123
+Kibana (Logs) http://localhost:5601
+Prometheus http://localhost:9090
+RabbitMQ Management http://localhost:15672 admin / admin123
+Command to run: docker-compose up --build
+Command to stop: docker-compose down
+Command for fresh start: docker-compose down -v
