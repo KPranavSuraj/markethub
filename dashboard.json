@@ -1,0 +1,56 @@
+{
+  "dashboard": {
+    "title": "MarketHub Monitoring",
+    "panels": [
+      {
+        "id": 1,
+        "title": "HTTP Request Rate",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{method}} {{route}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "id": 2,
+        "title": "Request Duration",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "id": 3,
+        "title": "Active Products",
+        "targets": [
+          {
+            "expr": "markethub_active_products",
+            "legendFormat": "Active Products"
+          }
+        ],
+        "type": "stat"
+      },
+      {
+        "id": 4,
+        "title": "Price Checks Total",
+        "targets": [
+          {
+            "expr": "rate(markethub_price_checks_total[5m])",
+            "legendFormat": "{{platform}}"
+          }
+        ],
+        "type": "graph"
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}
