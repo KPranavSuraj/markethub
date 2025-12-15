@@ -1,36 +1,29 @@
-import { jwtDecode } from 'jwt-decode';
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
-export const setToken = (token) => {
-  localStorage.setItem('token', token);
-};
-
-export const getToken = () => {
-  return localStorage.getItem('token');
-};
-
-export const removeToken = () => {
-  localStorage.removeItem('token');
-};
-
-export const isAuthenticated = () => {
-  const token = getToken();
-  if (!token) return false;
-
+const auth = async (req, res, next) => {
   try {
-    const decoded = jwtDecode(token);
-    return decoded.exp * 1000 > Date.now();
+    console.log('Authenticating request...');
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+
+    if (!token) {
+      return res.status(401).json({ message: 'No authentication token provided' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId).select('-password');
+
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    req.user = user;
+    req.userId = decoded.userId;
+    next();
   } catch (error) {
-    return false;
+    res.status(401).json({ message: 'Invalid or expired token' });
   }
+    console.log('Authenticating request...ended');
 };
 
-export const getUserInfo = () => {
-  const token = getToken();
-  if (!token) return null;
-
-  try {
-    return jwtDecode(token);
-  } catch (error) {
-    return null;
-  }
-};
+module.exports = auth;
